@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import '@/App.css'
 import { SelectedFile } from './components/UploadArea'
 import { RuleConfig } from './components/RuleConfig'
@@ -17,11 +17,33 @@ function App() {
     const [activeFileId, setActiveFileId] = useState<string | null>(null)
     const [table, setTable] = useState<DataTable | null>(null)
     const [parsingError, setParsingError] = useState<string | null>(null)
-    const [rules, setRules] = useState<CleaningRules>(() =>
-        createDefaultRules()
-    )
+    const [rulesMap, setRulesMap] = useState<Record<string, CleaningRules>>({})
     const [result, setResult] = useState<CleaningResult | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
+
+    // 当文件列表增加时，自动选中最新添加的文件
+    const prevFilesLength = useRef(0)
+    useEffect(() => {
+        if (files.length > prevFilesLength.current) {
+            const newlyAdded = files[files.length - 1]
+            if (newlyAdded) {
+                setActiveFileId(newlyAdded.id)
+                // 如果处于预览界面，自动返回配置界面
+                if (currentStep === 3) {
+                    setCurrentStep(2)
+                }
+            }
+        }
+        prevFilesLength.current = files.length
+    }, [files, currentStep])
+
+    const activeRules = activeFileId ? (rulesMap[activeFileId] ?? createDefaultRules()) : createDefaultRules()
+
+    const handleRulesChange = (newRules: CleaningRules) => {
+        if (activeFileId) {
+            setRulesMap(prev => ({ ...prev, [activeFileId]: newRules }))
+        }
+    }
 
     useEffect(() => {
         const preventDefault = (e: DragEvent) => {
@@ -90,7 +112,7 @@ function App() {
         if (!table) return
         setIsProcessing(true)
         try {
-            const next = applyCleaningRules(table, rules)
+            const next = applyCleaningRules(table, activeRules)
             setResult(next)
             setCurrentStep(3)
         } finally {
@@ -105,7 +127,7 @@ function App() {
         setTable(null)
         setResult(null)
         setParsingError(null)
-        setRules(createDefaultRules())
+        setRulesMap({})
     }
 
     return (
@@ -122,8 +144,8 @@ function App() {
                         columns={table?.columns ?? []}
                         table={table}
                         parsingError={parsingError}
-                        value={rules}
-                        onChange={setRules}
+                        value={activeRules}
+                        onChange={handleRulesChange}
                     />
                 )}
                 {currentStep === 3 && result && (
@@ -137,8 +159,8 @@ function App() {
                         columns={table?.columns ?? []}
                         table={table}
                         parsingError={parsingError}
-                        value={rules}
-                        onChange={setRules}
+                        value={activeRules}
+                        onChange={handleRulesChange}
                         previewResult={result}
                         onBackToRules={() => setCurrentStep(2)}
                         onRestart={handleRestart}
