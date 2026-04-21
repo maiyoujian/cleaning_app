@@ -13,9 +13,8 @@
         "windows": [
             {
                 "title": "cleaning_app",
-                "width": 1120,
-                "minHeight": 800,
-                "resizable": false
+                "minWidth": 1300,
+                "height": 1000
             }
         ],
         "security": {

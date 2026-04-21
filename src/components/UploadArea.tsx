@@ -1,28 +1,40 @@
+import { FileSpreadsheet, CheckCircle2, X, AlertCircle } from 'lucide-react'
 import {
-    FileSpreadsheet,
-    ShieldCheck,
-    CheckCircle2,
-    X,
-    AlertCircle
-} from 'lucide-react'
-import { useRef, useState, useEffect } from 'react'
+    useRef,
+    useState,
+    useEffect,
+    type Dispatch,
+    type SetStateAction
+} from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
-type FileStatus = 'reading' | 'success' | 'error'
+export type FileStatus = 'reading' | 'success' | 'error'
 
-interface FileWithStatus {
+export interface SelectedFile {
     id: string
     file: File
     status: FileStatus
     errorMessage?: string
+    path?: string
 }
 
-export function UploadArea() {
+interface UploadAreaProps {
+    files: SelectedFile[]
+    setFiles: Dispatch<SetStateAction<SelectedFile[]>>
+    embedded?: boolean
+    hideUI?: boolean
+}
+
+export function UploadArea({
+    files: selectedFiles,
+    setFiles: setSelectedFiles,
+    embedded,
+    hideUI
+}: UploadAreaProps) {
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isDragging, setIsDragging] = useState(false)
-    const [selectedFiles, setSelectedFiles] = useState<FileWithStatus[]>([])
     const uploadZoneRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -37,21 +49,65 @@ export function UploadArea() {
             }
         }
 
-        const handleDropWindow = (e: DragEvent) => {
+        const handleDropWindow = async (e: DragEvent) => {
             e.preventDefault()
             e.stopPropagation()
             setIsDragging(false)
             dragCounter.current = 0
 
             const files: File[] = []
+
             if (e.dataTransfer) {
                 if (e.dataTransfer.items) {
+                    const promises: Promise<void>[] = []
+
+                    const traverseFileTree = (
+                        item: any,
+                        path?: string
+                    ): Promise<void> => {
+                        return new Promise((resolve) => {
+                            if (item.isFile) {
+                                item.file((file: File) => {
+                                    files.push(file)
+                                    resolve()
+                                })
+                            } else if (item.isDirectory) {
+                                const dirReader = item.createReader()
+                                dirReader.readEntries((entries: any[]) => {
+                                    const entriesPromises = entries.map(
+                                        (entry) =>
+                                            traverseFileTree(
+                                                entry,
+                                                path
+                                                    ? path + item.name + '/'
+                                                    : item.name + '/'
+                                            )
+                                    )
+                                    Promise.all(entriesPromises).then(() =>
+                                        resolve()
+                                    )
+                                })
+                            } else {
+                                resolve()
+                            }
+                        })
+                    }
+
                     Array.from(e.dataTransfer.items).forEach((item) => {
                         if (item.kind === 'file') {
-                            const file = item.getAsFile()
-                            if (file) files.push(file)
+                            const entry =
+                                item.webkitGetAsEntry?.() ||
+                                (item as any).getAsEntry?.()
+                            if (entry) {
+                                promises.push(traverseFileTree(entry))
+                            } else {
+                                const file = item.getAsFile()
+                                if (file) files.push(file)
+                            }
                         }
                     })
+
+                    await Promise.all(promises)
                 } else if (e.dataTransfer.files) {
                     Array.from(e.dataTransfer.files).forEach((file) => {
                         files.push(file)
@@ -69,7 +125,7 @@ export function UploadArea() {
             })
 
             if (validFiles.length > 0) {
-                addFiles(validFiles)
+                addFiles(validFiles.map((file) => ({ file })))
             }
         }
 
@@ -111,39 +167,33 @@ export function UploadArea() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
     }
 
-    const addFiles = (files: File[]) => {
-        const newFiles: FileWithStatus[] = files.map((file) => ({
+    const addFiles = (items: Array<{ file: File; path?: string }>) => {
+        const newFiles: SelectedFile[] = items.map(({ file, path }) => ({
             file,
-            status: 'reading' as const,
-            id: Math.random().toString(36).substring(7) // unique id for each file entry
+            path,
+            status: 'success' as const,
+            id: Math.random().toString(36).substring(7)
         }))
 
         setSelectedFiles((prev) => [...prev, ...newFiles])
-
-        // Simulate reading for each new file
-        newFiles.forEach((fileWithStatus) => {
-            setTimeout(
-                () => {
-                    setSelectedFiles((prev) =>
-                        prev.map((item) =>
-                            item.id === fileWithStatus.id
-                                ? { ...item, status: 'success' as const }
-                                : item
-                        )
-                    )
-                },
-                800 + Math.random() * 1000
-            ) // Random reading time between 0.8s and 1.8s
-        })
     }
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            addFiles(Array.from(e.target.files))
-            // Reset input so the same file can be selected again if removed
-            if (fileInputRef.current) {
-                fileInputRef.current.value = ''
+            const validFiles = Array.from(e.target.files).filter((file) => {
+                const name = file.name.toLowerCase()
+                return (
+                    name.endsWith('.xlsx') ||
+                    name.endsWith('.xls') ||
+                    name.endsWith('.csv')
+                )
+            })
+            if (validFiles.length > 0) {
+                addFiles(validFiles.map((file) => ({ file })))
             }
+            if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
         }
     }
 
@@ -173,15 +223,12 @@ export function UploadArea() {
                             })
 
                             if (validPaths.length > 0) {
-                                // For Tauri, we mock the File object using the path since we can't easily
-                                // construct a real Web File object with full contents synchronously here.
-                                // In a real app, you would pass these paths to a Rust backend command to read them.
-                                const newFiles = validPaths.map((path) => {
+                                const newItems = validPaths.map((path) => {
                                     const name =
                                         path.split(/[\\/]/).pop() || path
-                                    return new File([], name) // Mock File with name
+                                    return { file: new File([], name), path }
                                 })
-                                addFiles(newFiles)
+                                addFiles(newItems)
                             }
                         }
                     }
@@ -209,14 +256,38 @@ export function UploadArea() {
         setSelectedFiles((prev) => prev.filter((f) => f.id !== id))
     }
 
-    const hasAnySuccess = selectedFiles.some((f) => f.status === 'success')
+    if (hideUI) {
+        return (
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".xlsx,.xls,.csv"
+                multiple
+                className="hidden"
+            />
+        )
+    }
 
     return (
-        <div className="flex flex-col gap-6 mt-6">
-            <div className="p-8 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-                <div className="mb-6">
+        <div
+            className={
+                embedded
+                    ? 'h-full flex items-center justify-center px-10 py-8'
+                    : 'flex flex-col gap-6 mt-6'
+            }
+        >
+            <div
+                className={cn(
+                    embedded
+                        ? 'w-full max-w-3xl text-center'
+                        : 'p-8 bg-white rounded-2xl shadow-sm border border-gray-100',
+                    'flex flex-col'
+                )}
+            >
+                <div className={cn(embedded ? 'mb-8' : 'mb-6')}>
                     <h2 className="text-xl font-semibold text-gray-900">
-                        上传Excel文件
+                        选择数据文件
                     </h2>
                     <p className="text-sm text-gray-500 mt-2">
                         支持 .xlsx、.xls、.csv • 首行作为表头 • 支持中英文
@@ -253,7 +324,20 @@ export function UploadArea() {
                         <h3 className="text-base font-medium text-gray-900">
                             拖拽文件到这里，或点击选择文件
                         </h3>
-                        <p className="text-sm text-gray-500 mt-3 text-center">
+                        <div className="flex gap-4 mt-3">
+                            <Button
+                                className="cursor-pointer"
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    fileInputRef.current?.click()
+                                }}
+                            >
+                                选择文件
+                            </Button>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-4 text-center">
                             支持一次选择多个文件，也可以多次添加
                         </p>
 
@@ -273,11 +357,6 @@ export function UploadArea() {
                     {isDragging && (
                         <div className="absolute inset-0 bg-blue-500/10 border-2 border-blue-500 border-dashed rounded-2xl pointer-events-none z-10" />
                     )}
-
-                    <div className="absolute bottom-6 flex items-center gap-1.5 text-xs text-gray-400">
-                        <ShieldCheck className="size-4" strokeWidth={1.5} />
-                        <span>所有处理都在您的浏览器本地完成</span>
-                    </div>
                 </div>
 
                 {selectedFiles.length > 0 && (
@@ -344,17 +423,6 @@ export function UploadArea() {
                     </div>
                 )}
             </div>
-
-            {hasAnySuccess && (
-                <div className="flex justify-end">
-                    <Button
-                        size="lg"
-                        className="bg-blue-600 hover:bg-blue-700 text-white p-5 shadow-md cursor-pointer"
-                    >
-                        下一步：配置规则
-                    </Button>
-                </div>
-            )}
         </div>
     )
 }
