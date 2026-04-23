@@ -1,8 +1,8 @@
 {
     "$schema": "https://schema.tauri.app/config/2",
-    "productName": "cleaning_app",
+    "productName": "Excel 脏数据清洗工具",
     "version": "0.1.0",
-    "identifier": "com.xxy.cleaning_app",
+    "identifier": "com.xxy.cleaning_app_alpha",
     "build": {
         "beforeDevCommand": "npm run dev",
         "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
     "app": {
         "windows": [
             {
-                "title": "cleaning_app",
+                "title": "Excel 脏数据清洗工具",
                 "minWidth": 1300,
                 "height": 1000
             }
