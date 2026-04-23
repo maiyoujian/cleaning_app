@@ -17,7 +17,7 @@ export function RuleConfigSidebar({
     rules
 }: RuleConfigSidebarProps) {
     return (
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
             <FileInfoWidget activeFile={activeFile} columns={columns} table={table} />
             <ExpectedResultsWidget rules={rules} table={table} />
         </div>

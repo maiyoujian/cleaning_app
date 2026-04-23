@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 
 interface ColumnChecklistProps {
@@ -49,7 +48,7 @@ export function ColumnChecklist({
                 </div>
             </div>
             <Separator />
-            <ScrollArea className={heightClassName}>
+            <div className={`overflow-y-auto ${heightClassName}`}>
                 <div className="flex flex-col gap-2 p-3">
                     {columns.map((c) => (
                         <label
@@ -75,7 +74,7 @@ export function ColumnChecklist({
                         </div>
                     )}
                 </div>
-            </ScrollArea>
+            </div>
         </div>
     )
 }

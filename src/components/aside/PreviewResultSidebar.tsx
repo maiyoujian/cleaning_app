@@ -14,7 +14,7 @@ export function PreviewResultSidebar({
     previewResult
 }: PreviewResultSidebarProps) {
     return (
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
             <FileInfoWidget activeFile={activeFile} />
             <SizeComparisonWidget stats={previewResult.stats} />
             <ProcessingDetailsWidget stats={previewResult.stats} />

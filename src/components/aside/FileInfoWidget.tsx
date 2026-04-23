@@ -17,7 +17,7 @@ interface FileInfoWidgetProps {
 
 export function FileInfoWidget({ activeFile, columns, table }: FileInfoWidgetProps) {
     return (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">文件名：</span>
                 <span className="font-medium text-gray-900 truncate max-w-[120px]" title={activeFile.file.name}>

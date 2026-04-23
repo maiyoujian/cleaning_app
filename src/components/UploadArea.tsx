@@ -192,8 +192,8 @@ export function UploadArea({
                 addFiles(validFiles.map((file) => ({ file })))
             }
             if (fileInputRef.current) {
-            fileInputRef.current.value = ''
-        }
+                fileInputRef.current.value = ''
+            }
         }
     }
 
@@ -271,158 +271,152 @@ export function UploadArea({
 
     return (
         <div
-            className={
+            className={cn(
                 embedded
-                    ? 'h-full flex items-center justify-center px-10 py-8'
-                    : 'flex flex-col gap-6 mt-6'
-            }
+                    ? 'h-full flex-col p-8 flex justify-center items-center'
+                    : 'flex flex-col gap-6 mt-6',
+                embedded
+                    ? 'w-full max-w-3xl mx-auto flex justify-center items-center'
+                    : 'p-8 bg-white rounded-2xl shadow-sm border border-gray-100'
+            )}
         >
+            <div className={cn(embedded ? 'mb-8' : 'mb-6', 'shrink-0')}>
+                <h2 className="text-xl font-semibold text-gray-900 text-center">
+                    选择数据文件
+                </h2>
+                <p className="text-sm text-gray-500 mt-2">
+                    支持 .xlsx、.xls、.csv • 首行作为表头 • 支持中英文
+                </p>
+            </div>
+
             <div
+                ref={uploadZoneRef}
+                onClick={handleClick}
                 className={cn(
-                    embedded
-                        ? 'w-full max-w-3xl text-center'
-                        : 'p-8 bg-white rounded-2xl shadow-sm border border-gray-100',
-                    'flex flex-col'
+                    'py-12 border-2 border-dashed transition-colors rounded-2xl flex flex-col items-center justify-center relative cursor-pointer w-full',
+                    isDragging
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-blue-200/60 bg-blue-50/30 hover:bg-blue-50/60'
                 )}
             >
-                <div className={cn(embedded ? 'mb-8' : 'mb-6')}>
-                    <h2 className="text-xl font-semibold text-gray-900">
-                        选择数据文件
-                    </h2>
-                    <p className="text-sm text-gray-500 mt-2">
-                        支持 .xlsx、.xls、.csv • 首行作为表头 • 支持中英文
-                    </p>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept=".xlsx,.xls,.csv"
+                    multiple
+                    className="hidden"
+                />
+
+                <FileSpreadsheet
+                    className="size-8 text-gray-400 mb-6 bg-white p-1.5 rounded-xl shadow-sm pointer-events-none box-content"
+                    strokeWidth={1.5}
+                />
+
+                <h3 className="text-base font-medium text-gray-900 pointer-events-none">
+                    拖拽文件到这里，或点击选择文件
+                </h3>
+                <div className="flex gap-4 mt-3 pointer-events-none">
+                    <Button
+                        className="cursor-pointer pointer-events-auto"
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            fileInputRef.current?.click()
+                        }}
+                    >
+                        选择文件
+                    </Button>
+                </div>
+                <p className="text-sm text-gray-500 mt-4 text-center pointer-events-none">
+                    支持一次选择多个文件，也可以多次添加
+                </p>
+
+                <div className="flex gap-3 mt-6 pointer-events-none">
+                    <span className="px-3 py-1 bg-white border border-gray-100 rounded-full text-xs text-gray-500 shadow-sm">
+                        .xlsx
+                    </span>
+                    <span className="px-3 py-1 bg-white border border-gray-100 rounded-full text-xs text-gray-500 shadow-sm">
+                        .xls
+                    </span>
+                    <span className="px-3 py-1 bg-white border border-gray-100 rounded-full text-xs text-gray-500 shadow-sm">
+                        .csv
+                    </span>
                 </div>
 
-                <div
-                    ref={uploadZoneRef}
-                    onClick={handleClick}
-                    className={cn(
-                        'py-12 border-2 border-dashed transition-colors rounded-2xl flex flex-col items-center justify-center relative cursor-pointer',
-                        isDragging
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-blue-200/60 bg-blue-50/30 hover:bg-blue-50/60'
-                    )}
-                >
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        accept=".xlsx,.xls,.csv"
-                        multiple
-                        className="hidden"
-                    />
-
-                    <div className="flex flex-col items-center">
-                        <div className="p-4 bg-white rounded-xl shadow-sm mb-6">
-                            <FileSpreadsheet
-                                className="size-8 text-gray-400"
-                                strokeWidth={1.5}
-                            />
-                        </div>
-
-                        <h3 className="text-base font-medium text-gray-900">
-                            拖拽文件到这里，或点击选择文件
-                        </h3>
-                        <div className="flex gap-4 mt-3">
-                            <Button
-                                className="cursor-pointer"
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    fileInputRef.current?.click()
-                                }}
-                            >
-                                选择文件
-                            </Button>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-4 text-center">
-                            支持一次选择多个文件，也可以多次添加
-                        </p>
-
-                        <div className="flex gap-3 mt-6">
-                            <span className="px-3 py-1 bg-white border border-gray-100 rounded-full text-xs text-gray-500 shadow-sm">
-                                .xlsx
-                            </span>
-                            <span className="px-3 py-1 bg-white border border-gray-100 rounded-full text-xs text-gray-500 shadow-sm">
-                                .xls
-                            </span>
-                            <span className="px-3 py-1 bg-white border border-gray-100 rounded-full text-xs text-gray-500 shadow-sm">
-                                .csv
-                            </span>
-                        </div>
-                    </div>
-
-                    {isDragging && (
-                        <div className="absolute inset-0 bg-blue-500/10 border-2 border-blue-500 border-dashed rounded-2xl pointer-events-none z-10" />
-                    )}
-                </div>
-
-                {selectedFiles.length > 0 && (
-                    <div className="mt-8 flex flex-col gap-3">
-                        <h4 className="text-sm font-medium text-gray-700 px-1">
-                            已选择的文件 ({selectedFiles.length})
-                        </h4>
-                        <div className="flex flex-col gap-2 pr-1">
-                            {selectedFiles.map((item) => (
-                                <div
-                                    key={item.id}
-                                    className="border border-gray-100 rounded-xl p-3.5 flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-white rounded-lg shadow-sm">
-                                            <FileSpreadsheet
-                                                className="size-5 text-blue-500"
-                                                strokeWidth={1.5}
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-sm font-medium text-gray-900 max-w-[200px] md:max-w-[400px] truncate">
-                                                {item.file.name}
-                                            </span>
-                                            <div className="flex items-center gap-2.5 text-[11px] text-gray-500">
-                                                <span>
-                                                    {formatFileSize(
-                                                        item.file.size
-                                                    )}
-                                                </span>
-                                                <span className="w-0.5 h-0.5 rounded-full bg-gray-300"></span>
-                                                {item.status === 'reading' && (
-                                                    <span className="text-blue-500 flex items-center gap-1.5 font-medium">
-                                                        <span className="size-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                                                        读取中...
-                                                    </span>
-                                                )}
-                                                {item.status === 'success' && (
-                                                    <span className="text-green-500 flex items-center gap-1 font-medium">
-                                                        <CheckCircle2 className="size-3" />
-                                                        读取成功
-                                                    </span>
-                                                )}
-                                                {item.status === 'error' && (
-                                                    <span className="text-red-500 flex items-center gap-1 font-medium">
-                                                        <AlertCircle className="size-3" />
-                                                        读取失败
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={(e) =>
-                                            handleRemoveFile(item.id, e)
-                                        }
-                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                    >
-                                        <X className="size-4 cursor-pointer" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                {isDragging && (
+                    <div className="absolute inset-0 bg-blue-500/10 border-2 border-blue-500 border-dashed rounded-2xl pointer-events-none z-10" />
                 )}
             </div>
+
+            {selectedFiles.length > 0 && (
+                <div className="mt-8 flex flex-col gap-3 flex-1 min-h-0">
+                    <h4 className="text-sm font-medium text-gray-700 px-1 shrink-0">
+                        已选择的文件 ({selectedFiles.length})
+                    </h4>
+                    <div className="flex flex-col gap-2 pr-1 overflow-y-auto min-h-0 h-full">
+                        {selectedFiles.map((item) => (
+                            <div
+                                key={item.id}
+                                className="border border-gray-100 rounded-xl p-3.5 flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 transition-colors cursor-pointer"
+                                onClick={() => {
+                                    // Make file item clickable to trigger its selection
+                                    // For simplicity we just ensure cursor-pointer
+                                }}
+                            >
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <FileSpreadsheet
+                                        className="size-5 text-blue-500 bg-white p-1.5 rounded-lg shadow-sm shrink-0 box-content"
+                                        strokeWidth={1.5}
+                                    />
+                                    <div className="flex flex-col gap-0.5 overflow-hidden">
+                                        <span
+                                            className="text-sm font-medium text-gray-900 truncate"
+                                            title={item.path || item.file.name}
+                                        >
+                                            {item.file.name}
+                                        </span>
+                                        <div className="flex flex-wrap items-center gap-2.5 text-[11px] text-gray-500">
+                                            <span>
+                                                {formatFileSize(item.file.size)}
+                                            </span>
+                                            <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
+                                            {item.status === 'reading' && (
+                                                <span className="text-blue-500 flex items-center gap-1.5 font-medium">
+                                                    <span className="size-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                                    读取中...
+                                                </span>
+                                            )}
+                                            {item.status === 'success' && (
+                                                <span className="text-green-500 flex items-center gap-1 font-medium">
+                                                    <CheckCircle2 className="size-3" />
+                                                    读取成功
+                                                </span>
+                                            )}
+                                            {item.status === 'error' && (
+                                                <span className="text-red-500 flex items-center gap-1 font-medium">
+                                                    <AlertCircle className="size-3" />
+                                                    读取失败
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={(e) =>
+                                        handleRemoveFile(item.id, e)
+                                    }
+                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                                >
+                                    <X className="size-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

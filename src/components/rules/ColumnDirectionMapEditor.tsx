@@ -1,5 +1,4 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { FillDirection } from '@/lib/cleaning'
 
 interface ColumnDirectionMapEditorProps {
@@ -18,7 +17,7 @@ export function ColumnDirectionMapEditor({
     emptyText = '请先选择左侧的列'
 }: ColumnDirectionMapEditorProps) {
     return (
-        <ScrollArea className="h-44 border rounded-xl bg-card p-2">
+        <div className="h-44 border rounded-xl bg-card p-2 overflow-y-auto">
             {columns.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                     {emptyText}
@@ -53,7 +52,7 @@ export function ColumnDirectionMapEditor({
                     ))}
                 </div>
             )}
-        </ScrollArea>
+        </div>
     )
 }
 

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import '@/App.css'
 import { SelectedFile } from './components/UploadArea'
-import { RuleConfig } from './components/RuleConfig'
+import { WorkspaceLayout } from './components/layout/WorkspaceLayout'
+import { RuleEditor } from './components/workspace/RuleEditor'
+import { PreviewViewer } from './components/workspace/PreviewViewer'
+import { invoke } from '@tauri-apps/api/core'
 import {
     applyCleaningRules,
     createDefaultRules,
@@ -110,10 +113,47 @@ function App() {
 
     const handleRun = async () => {
         if (!table) return
+        
+        const active = files.find((f) => f.id === activeFileId)
+        if (!active) return
+
         setIsProcessing(true)
         try {
-            const next = applyCleaningRules(table, activeRules)
-            setResult(next)
+            // 尝试通过 Tauri IPC 调用 Rust -> Python 的最佳实践链路
+            // 检查是否有真实路径（桌面端拖拽或通过 dialog 选择时应该有真实路径，这里假设存在 path 属性）
+            // 在实际的 Tauri v2 开发中，通常使用 @tauri-apps/plugin-dialog 获取文件绝对路径
+            // 但如果是在纯 Web 环境测试，或者拿不到绝对路径，则降级使用 TypeScript 版本的 mock 逻辑
+            
+            let resultData: CleaningResult | null = null
+            let isTauriEnv = false
+            
+            try {
+                // 探测是否在 Tauri 环境中
+                isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+            } catch (e) {
+                isTauriEnv = false
+            }
+
+            if (isTauriEnv && active.path) {
+                try {
+                    console.log('正在调用 Tauri Rust 后端与 Python...')
+                    const rulesJson = JSON.stringify(activeRules)
+                    const resultJson = await invoke<string>('run_python_cleaner', {
+                        filePath: active.path,
+                        rulesJson: rulesJson
+                    })
+                    resultData = JSON.parse(resultJson) as CleaningResult
+                } catch (err) {
+                    console.error('Python 后端执行失败，回退到前端 Mock 逻辑:', err)
+                    // 后端执行失败，降级回退
+                    resultData = applyCleaningRules(table, activeRules)
+                }
+            } else {
+                console.log('未检测到 Tauri 环境或缺少文件绝对路径，使用前端 Mock 逻辑')
+                resultData = applyCleaningRules(table, activeRules)
+            }
+
+            setResult(resultData)
             setCurrentStep(3)
         } finally {
             setIsProcessing(false)
@@ -133,39 +173,38 @@ function App() {
     return (
         <main className="h-screen w-screen overflow-hidden bg-slate-50/50 border-t border-gray-200">
             <div className="h-full w-full">
-                {currentStep === 2 && (
-                    <RuleConfig
-                        onRun={handleRun}
-                        isProcessing={isProcessing}
-                        files={files}
-                        setFiles={setFiles}
-                        activeFileId={activeFileId}
-                        onActiveFileIdChange={setActiveFileId}
-                        columns={table?.columns ?? []}
-                        table={table}
-                        parsingError={parsingError}
-                        value={activeRules}
-                        onChange={handleRulesChange}
-                    />
-                )}
-                {currentStep === 3 && result && (
-                    <RuleConfig
-                        onRun={handleRun}
-                        isProcessing={isProcessing}
-                        files={files}
-                        setFiles={setFiles}
-                        activeFileId={activeFileId}
-                        onActiveFileIdChange={setActiveFileId}
-                        columns={table?.columns ?? []}
-                        table={table}
-                        parsingError={parsingError}
-                        value={activeRules}
-                        onChange={handleRulesChange}
-                        previewResult={result}
-                        onBackToRules={() => setCurrentStep(2)}
-                        onRestart={handleRestart}
-                    />
-                )}
+                <WorkspaceLayout
+                    files={files}
+                    setFiles={setFiles}
+                    activeFileId={activeFileId}
+                    onActiveFileIdChange={setActiveFileId}
+                    columns={table?.columns ?? []}
+                    table={table}
+                    rules={activeRules}
+                    previewResult={currentStep === 3 && result ? result : undefined}
+                    onBackToRules={() => setCurrentStep(2)}
+                >
+                    {currentStep === 2 && (
+                        <RuleEditor
+                            files={files}
+                            setFiles={setFiles}
+                            columns={table?.columns ?? []}
+                            rules={activeRules}
+                            onChange={handleRulesChange}
+                            parsingError={parsingError}
+                            isProcessing={isProcessing}
+                            onRun={handleRun}
+                        />
+                    )}
+                    {currentStep === 3 && result && (
+                        <PreviewViewer
+                            activeFile={files.find(f => f.id === activeFileId) ?? null}
+                            previewResult={result}
+                            onBackToRules={() => setCurrentStep(2)}
+                            onRestart={handleRestart}
+                        />
+                    )}
+                </WorkspaceLayout>
             </div>
         </main>
     )

@@ -12,14 +12,19 @@ export function ProcessingDetailsWidget({ stats }: ProcessingDetailsWidgetProps)
         stats.filledDefaultCells > 0 ||
         stats.filledForwardBackwardCells > 0 ||
         stats.formattedDateCells > 0 ||
+        stats.formattedCurrencyCells > 0 ||
         stats.normalizedPhoneCells > 0 ||
         stats.normalizedEmailCells > 0 ||
-        stats.cleanedTextCells > 0
+        stats.cleanedTextCells > 0 ||
+        (stats.renamedColumns ?? 0) > 0 ||
+        (stats.droppedColumns ?? 0) > 0 ||
+        (stats.splitColumnsAdded ?? 0) > 0 ||
+        (stats.mergedColumnsAdded ?? 0) > 0
 
     return (
         <div className="pt-5 border-t border-gray-200/60 space-y-4">
             <h3 className="text-sm font-semibold text-gray-900">处理明细</h3>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
                 {stats.removedEmptyRows > 0 && (
                     <div className="flex items-center justify-between text-sm bg-white px-3 py-2 rounded-lg border border-gray-100 shadow-sm">
                         <span className="text-gray-600">删除空行</span>
@@ -56,6 +61,12 @@ export function ProcessingDetailsWidget({ stats }: ProcessingDetailsWidgetProps)
                         <span className="font-semibold text-gray-900">{stats.formattedDateCells}</span>
                     </div>
                 )}
+                {stats.formattedCurrencyCells > 0 && (
+                    <div className="flex items-center justify-between text-sm bg-white px-3 py-2 rounded-lg border border-gray-100 shadow-sm">
+                        <span className="text-gray-600">金额格式化</span>
+                        <span className="font-semibold text-gray-900">{stats.formattedCurrencyCells}</span>
+                    </div>
+                )}
                 {stats.normalizedPhoneCells > 0 && (
                     <div className="flex items-center justify-between text-sm bg-white px-3 py-2 rounded-lg border border-gray-100 shadow-sm">
                         <span className="text-gray-600">手机号规范化</span>
@@ -72,6 +83,30 @@ export function ProcessingDetailsWidget({ stats }: ProcessingDetailsWidgetProps)
                     <div className="flex items-center justify-between text-sm bg-white px-3 py-2 rounded-lg border border-gray-100 shadow-sm">
                         <span className="text-gray-600">文本清理</span>
                         <span className="font-semibold text-gray-900">{stats.cleanedTextCells}</span>
+                    </div>
+                )}
+                {(stats.renamedColumns ?? 0) > 0 && (
+                    <div className="flex items-center justify-between text-sm bg-white px-3 py-2 rounded-lg border border-gray-100 shadow-sm">
+                        <span className="text-gray-600">重命名列</span>
+                        <span className="font-semibold text-gray-900">{stats.renamedColumns}</span>
+                    </div>
+                )}
+                {(stats.droppedColumns ?? 0) > 0 && (
+                    <div className="flex items-center justify-between text-sm bg-white px-3 py-2 rounded-lg border border-gray-100 shadow-sm">
+                        <span className="text-gray-600">删除列</span>
+                        <span className="font-semibold text-gray-900">{stats.droppedColumns}</span>
+                    </div>
+                )}
+                {(stats.splitColumnsAdded ?? 0) > 0 && (
+                    <div className="flex items-center justify-between text-sm bg-white px-3 py-2 rounded-lg border border-gray-100 shadow-sm">
+                        <span className="text-gray-600">列拆分</span>
+                        <span className="font-semibold text-gray-900">{stats.splitColumnsAdded}</span>
+                    </div>
+                )}
+                {(stats.mergedColumnsAdded ?? 0) > 0 && (
+                    <div className="flex items-center justify-between text-sm bg-white px-3 py-2 rounded-lg border border-gray-100 shadow-sm">
+                        <span className="text-gray-600">列合并</span>
+                        <span className="font-semibold text-gray-900">{stats.mergedColumnsAdded}</span>
                     </div>
                 )}
                 

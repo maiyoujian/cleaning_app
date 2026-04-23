@@ -8,7 +8,7 @@ export function SizeComparisonWidget({ stats }: SizeComparisonWidgetProps) {
     return (
         <div className="pt-5 border-t border-gray-200/60 space-y-4">
             <h3 className="text-sm font-semibold text-gray-900">规模对比</h3>
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">原始数据：</span>
                     <span className="font-medium text-gray-900">{stats.rowsBefore} 行 / {stats.colsBefore} 列</span>

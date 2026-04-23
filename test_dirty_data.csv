@@ -1,0 +1,11 @@
+id,user_name,age,phone,email,join_date,salary,address_code,first_name,last_name,drop_me,empty_col,notes
+1,Alice,25,+86 138-0000-1111, ALICE@Example.com ,2023-01-01,"$1,234.56",BJ-100000,A,lice,x,,good
+2,Bob,30,13911112222,bob@example.com,2023/02/02,¥ 2345.6,SH-200000,B,ob,x,,bad
+3,Charlie,,137 0000 3333,CHARLIE@EXAMPLE.COM,2023.03.03,€ 3456.789,GZ-300000,C,harlie,x,,
+3,Charlie,,137 0000 3333,CHARLIE@EXAMPLE.COM,2023.03.03,€ 3456.789,GZ-300000,C,harlie,x,,
+ 4 ,David,40,010-88889999,david@example.com,2023年10月11日,4567,SZ-400000,D,avid,x,,
+5,Eve,22,13611114444,EVE@example.com,2023-05-01 12:30:00,-5678.9,HZ-500000,E,ve,x,,
+6,Frank,290, 135 2222 5555 , frank@example.com,2023 - 11- 30 20 ：20:10,6789.01,CD-600000,F,rank,x,,ok
+,Ghost,,,ghost@example,2023年09月02日 16 时 49 分,,,,,x,, 
+7,Grace,28,(+86) 134-3333-6666,Grace@example.com,20231225,RMB 7890.123,NJ-700000,G,race,x,,
+,,,,,,,,,,,,

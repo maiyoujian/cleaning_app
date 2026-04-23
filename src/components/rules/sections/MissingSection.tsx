@@ -1,7 +1,7 @@
-import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CleaningRules } from '@/lib/cleaning'
 import { ColumnChecklist } from '@/components/rules/ColumnChecklist'
 import { ColumnStringMapEditor } from '@/components/rules/ColumnStringMapEditor'
@@ -21,14 +21,14 @@ interface MissingSectionProps {
 
 export function MissingSection({ columns, value, onChange }: MissingSectionProps) {
     return (
-        <AccordionItem value="missing">
-            <AccordionTrigger>
-                <div className="flex items-center gap-3">
-                    <Eraser />
-                    <span>空值处理</span>
+        <section className="flex flex-col gap-5">
+            <h3 className="flex items-center gap-3 text-base font-semibold text-slate-900">
+                <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                    <Eraser className="size-4" />
                 </div>
-            </AccordionTrigger>
-            <AccordionContent className="flex flex-col gap-5 overflow-visible">
+                <span>空值处理</span>
+            </h3>
+            <div className="flex flex-col gap-5 overflow-visible">
                 <div className="flex items-center justify-between gap-6 rounded-xl border bg-card p-4">
                     <div className="flex flex-col gap-1">
                         <div className="font-medium">空值判断</div>
@@ -39,6 +39,7 @@ export function MissingSection({ columns, value, onChange }: MissingSectionProps
                     <div className="flex items-center gap-3">
                         <Label className="text-sm">去除首尾空白再判断</Label>
                         <Switch
+                            className="cursor-pointer"
                             checked={value.trimWhitespaceForEmptyCheck}
                             onCheckedChange={(checked) =>
                                 onChange({ ...value, trimWhitespaceForEmptyCheck: checked })
@@ -47,27 +48,64 @@ export function MissingSection({ columns, value, onChange }: MissingSectionProps
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="flex items-center justify-between gap-4 rounded-xl border bg-card p-4">
+                <div className="rounded-xl border bg-card p-4">
+                    <div className="flex items-center justify-between gap-4">
                         <div className="flex flex-col gap-1">
                             <div className="font-medium">删除空行</div>
-                            <div className="text-sm text-muted-foreground">全列都为空的行会被删除</div>
+                            <div className="text-sm text-muted-foreground">删除包含空值的行</div>
                         </div>
                         <Switch
-                            checked={value.removeEmptyRows}
-                            onCheckedChange={(checked) => onChange({ ...value, removeEmptyRows: checked })}
+                            className="cursor-pointer"
+                            checked={value.removeEmptyRows.enabled}
+                            onCheckedChange={(checked) => onChange({ ...value, removeEmptyRows: { ...value.removeEmptyRows, enabled: checked } })}
                         />
                     </div>
-                    <div className="flex items-center justify-between gap-4 rounded-xl border bg-card p-4">
-                        <div className="flex flex-col gap-1">
-                            <div className="font-medium">删除空列</div>
-                            <div className="text-sm text-muted-foreground">全行都为空的列会被删除</div>
+                    {value.removeEmptyRows.enabled && (
+                        <div className="mt-4 flex flex-col gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                                <div className="flex flex-col gap-2">
+                                    <Label>检查范围</Label>
+                                    <Select
+                                        value={value.removeEmptyRows.columnsMode}
+                                        onValueChange={(v) => onChange({ ...value, removeEmptyRows: { ...value.removeEmptyRows, columnsMode: v as 'all' | 'custom' } })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">所有列</SelectItem>
+                                            <SelectItem value="custom">指定列</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <Label>删除条件</Label>
+                                    <Select
+                                        value={value.removeEmptyRows.condition}
+                                        onValueChange={(v) => onChange({ ...value, removeEmptyRows: { ...value.removeEmptyRows, condition: v as 'all' | 'any' } })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">检查范围内的列全部为空时删除</SelectItem>
+                                            <SelectItem value="any">检查范围内的列任意为空时删除</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            {value.removeEmptyRows.columnsMode === 'custom' && (
+                                <div className="flex flex-col gap-2">
+                                    <Label>参与检查的列</Label>
+                                    <ColumnChecklist
+                                        columns={columns}
+                                        value={value.removeEmptyRows.columns}
+                                        onChange={(next) => onChange({ ...value, removeEmptyRows: { ...value.removeEmptyRows, columns: next } })}
+                                    />
+                                </div>
+                            )}
                         </div>
-                        <Switch
-                            checked={value.removeEmptyCols}
-                            onCheckedChange={(checked) => onChange({ ...value, removeEmptyCols: checked })}
-                        />
-                    </div>
+                    )}
                 </div>
 
                 <div className="rounded-xl border bg-card p-4">
@@ -77,6 +115,7 @@ export function MissingSection({ columns, value, onChange }: MissingSectionProps
                             <div className="text-sm text-muted-foreground">对指定列的空值填充固定默认值</div>
                         </div>
                         <Switch
+                            className="cursor-pointer"
                             checked={value.fillDefault.enabled}
                             onCheckedChange={(checked) =>
                                 onChange({
@@ -88,7 +127,7 @@ export function MissingSection({ columns, value, onChange }: MissingSectionProps
                     </div>
                     {value.fillDefault.enabled && (
                         <div className="mt-4 flex flex-col gap-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                                 <div className="flex flex-col gap-2">
                                     <Label>目标列</Label>
                                     <ColumnChecklist
@@ -125,6 +164,7 @@ export function MissingSection({ columns, value, onChange }: MissingSectionProps
                                     </div>
                                 </div>
                                 <Switch
+                                    className="cursor-pointer"
                                     checked={value.fillDefault.onlyWhenEmpty}
                                     onCheckedChange={(checked) =>
                                         onChange({
@@ -147,6 +187,7 @@ export function MissingSection({ columns, value, onChange }: MissingSectionProps
                             </div>
                         </div>
                         <Switch
+                            className="cursor-pointer"
                             checked={value.fillForwardBackward.enabled}
                             onCheckedChange={(checked) =>
                                 onChange({
@@ -160,7 +201,7 @@ export function MissingSection({ columns, value, onChange }: MissingSectionProps
                         />
                     </div>
                     {value.fillForwardBackward.enabled && (
-                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                             <div className="flex flex-col gap-2">
                                 <Label>目标列</Label>
                                 <ColumnChecklist
@@ -212,8 +253,8 @@ export function MissingSection({ columns, value, onChange }: MissingSectionProps
                         </div>
                     )}
                 </div>
-            </AccordionContent>
-        </AccordionItem>
+            </div>
+        </section>
     )
 }
 

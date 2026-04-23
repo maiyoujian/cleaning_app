@@ -15,7 +15,11 @@ export type KeepStrategy = 'first' | 'last'
 export type DateOutputFormat =
     | 'YYYY-MM-DD'
     | 'YYYY/MM/DD'
+    | 'YYYY-MM-DD HH:mm'
     | 'YYYY-MM-DD HH:mm:ss'
+    | 'YYYY年MM月DD日'
+    | 'YYYY年MM月DD日 HH时mm分'
+    | 'YYYY年MM月DD日 HH时mm分ss秒'
     | 'ISO'
 export type TimezoneMode = 'local' | 'utc'
 export type InvalidDateHandling = 'keep' | 'empty'
@@ -25,8 +29,12 @@ export type PhoneOutputMode = 'E164' | 'digits'
 export interface CleaningRules {
     missing: {
         trimWhitespaceForEmptyCheck: boolean
-        removeEmptyRows: boolean
-        removeEmptyCols: boolean
+        removeEmptyRows: {
+            enabled: boolean
+            condition: 'all' | 'any'
+            columnsMode: 'all' | 'custom'
+            columns: string[]
+        }
         fillDefault: {
             enabled: boolean
             columns: string[]
@@ -55,6 +63,13 @@ export interface CleaningRules {
             timezone: TimezoneMode
             onInvalid: InvalidDateHandling
         }
+        currency: {
+            enabled: boolean
+            columns: string[]
+            symbol: string
+            decimalPlaces: number
+            thousandsSeparator: boolean
+        }
         phone: {
             enabled: boolean
             columns: string[]
@@ -77,6 +92,10 @@ export interface CleaningRules {
         }
     }
     columns: {
+        removeEmptyCols: {
+            enabled: boolean
+            condition: 'all' | 'any'
+        }
         rename: {
             enabled: boolean
             mappings: Array<{ from: string; to: string }>
@@ -113,6 +132,7 @@ export interface CleaningStats {
     filledForwardBackwardCells: number
     removedDuplicates: number
     formattedDateCells: number
+    formattedCurrencyCells: number
     normalizedPhoneCells: number
     normalizedEmailCells: number
     cleanedTextCells: number
@@ -138,8 +158,12 @@ export function createDefaultRules(): CleaningRules {
     return {
         missing: {
             trimWhitespaceForEmptyCheck: true,
-            removeEmptyRows: false,
-            removeEmptyCols: false,
+            removeEmptyRows: {
+                enabled: false,
+                condition: 'all',
+                columnsMode: 'all',
+                columns: []
+            },
             fillDefault: {
                 enabled: false,
                 columns: [],
@@ -168,10 +192,17 @@ export function createDefaultRules(): CleaningRules {
                 timezone: 'local',
                 onInvalid: 'keep'
             },
+            currency: {
+                enabled: false,
+                columns: [],
+                symbol: '¥',
+                decimalPlaces: 2,
+                thousandsSeparator: true
+            },
             phone: {
                 enabled: false,
                 columns: [],
-                countryCode: '86',
+                countryCode: '',
                 output: 'digits'
             },
             email: {
@@ -190,6 +221,10 @@ export function createDefaultRules(): CleaningRules {
             }
         },
         columns: {
+            removeEmptyCols: {
+                enabled: false,
+                condition: 'all'
+            },
             rename: { enabled: false, mappings: [] },
             drop: { enabled: false, columns: [] },
             split: {
@@ -211,8 +246,8 @@ export function createDefaultRules(): CleaningRules {
 }
 
 function normalizeHeaderName(name: unknown, index: number) {
-    const raw = String(name ?? '').trim()
-    return raw.length > 0 ? raw : `列${index + 1}`
+    const raw = String(name ?? '')
+    return raw.trim().length > 0 ? raw : `列${index + 1}` // 注意：表头名称为了不重名和展示，还是保留了判断逻辑，但最好也不要 trim
 }
 
 function uniqueHeaders(headers: unknown[]) {
@@ -225,23 +260,7 @@ function uniqueHeaders(headers: unknown[]) {
     })
 }
 
-function aoaToTable(aoa: unknown[][]): DataTable {
-    if (!aoa.length) return { columns: [], rows: [] }
-    const columns = uniqueHeaders(aoa[0] ?? [])
-    const rows: DataRow[] = []
 
-    for (let r = 1; r < aoa.length; r++) {
-        const arr = aoa[r] ?? []
-        const row: DataRow = {}
-        columns.forEach((col, c) => {
-            const v = arr[c]
-            row[col] = v == null ? '' : String(v)
-        })
-        rows.push(row)
-    }
-
-    return { columns, rows }
-}
 
 export async function parseSpreadsheetFile(file: File): Promise<DataTable> {
     const name = file.name.toLowerCase()
@@ -251,8 +270,31 @@ export async function parseSpreadsheetFile(file: File): Promise<DataTable> {
         const parsed = Papa.parse<string[]>(text, {
             skipEmptyLines: false
         })
-        const aoa = (parsed.data as unknown as unknown[][]) ?? []
-        return aoaToTable(aoa)
+        const aoa = (parsed.data as unknown[][]) ?? []
+        // 对于 CSV，保留所有空格，不做任何自动 trim
+        if (!aoa.length) return { columns: [], rows: [] }
+        const columns = uniqueHeaders(aoa[0] ?? [])
+        const rows: DataRow[] = []
+
+        // 跳过最后一行如果是完全空的（Papa.parse 常见的行为）
+        const len = aoa.length > 1 && aoa[aoa.length - 1].length === 1 && String(aoa[aoa.length - 1][0]).trim() === '' 
+            ? aoa.length - 1 
+            : aoa.length
+
+        for (let r = 1; r < len; r++) {
+            const arr = aoa[r] ?? []
+            // 跳过 CSV 中可能因为空行产生的完全空的数组（比如只有一个空字符串的数组），除非它确实有数据列
+            // 但为了真实反映脏数据，我们还是保留空行，交由规则去处理
+            const row: DataRow = {}
+            columns.forEach((col, c) => {
+                const v = arr[c]
+                // 强制将 null/undefined 转为空字符串，保留任何可能存在的首尾空格
+                row[col] = v == null ? '' : String(v)
+            })
+            rows.push(row)
+        }
+
+        return { columns, rows }
     }
 
     if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
@@ -263,9 +305,25 @@ export async function parseSpreadsheetFile(file: File): Promise<DataTable> {
         const aoa = XLSX.utils.sheet_to_json(sheet, {
             header: 1,
             blankrows: true,
-            raw: false
+            raw: false,
+            defval: '' // 强制将空单元格转换为 '' 而不是忽略
         }) as unknown[][]
-        return aoaToTable(aoa)
+        // 对于 Excel，同样保留所有空格，不做任何自动 trim
+        if (!aoa.length) return { columns: [], rows: [] }
+        const columns = uniqueHeaders(aoa[0] ?? [])
+        const rows: DataRow[] = []
+
+        for (let r = 1; r < aoa.length; r++) {
+            const arr = aoa[r] ?? []
+            const row: DataRow = {}
+            columns.forEach((col, c) => {
+                const v = arr[c]
+                row[col] = v == null ? '' : String(v)
+            })
+            rows.push(row)
+        }
+
+        return { columns, rows }
     }
 
     return { columns: [], rows: [] }
@@ -290,8 +348,15 @@ function formatDate(date: Date, fmt: DateOutputFormat, tz: TimezoneMode) {
 
     if (fmt === 'ISO') return date.toISOString()
     if (fmt === 'YYYY/MM/DD') return `${year}/${pad2(month)}/${pad2(day)}`
+    if (fmt === 'YYYY-MM-DD HH:mm')
+        return `${year}-${pad2(month)}-${pad2(day)} ${pad2(hours)}:${pad2(minutes)}`
     if (fmt === 'YYYY-MM-DD HH:mm:ss')
         return `${year}-${pad2(month)}-${pad2(day)} ${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`
+    if (fmt === 'YYYY年MM月DD日') return `${year}年${pad2(month)}月${pad2(day)}日`
+    if (fmt === 'YYYY年MM月DD日 HH时mm分')
+        return `${year}年${pad2(month)}月${pad2(day)}日 ${pad2(hours)}时${pad2(minutes)}分`
+    if (fmt === 'YYYY年MM月DD日 HH时mm分ss秒')
+        return `${year}年${pad2(month)}月${pad2(day)}日 ${pad2(hours)}时${pad2(minutes)}分${pad2(seconds)}秒`
     return `${year}-${pad2(month)}-${pad2(day)}`
 }
 
@@ -299,13 +364,48 @@ function tryParseDate(input: string): Date | null {
     const v = input.trim()
     if (!v) return null
 
-    const t = Date.parse(v)
-    if (!Number.isNaN(t)) return new Date(t)
+    // 先尝试通用的中文清理（将年月替换为-，将日、时、分、秒提取）
+    // 这可以极大增强 Date.parse() 和我们自定义正则的兼容性
+    let normalized = v
+        .replace(/年|月/g, '-')
+        .replace(/日/g, ' ')
+        .replace(/时|分/g, ':')
+        .replace(/秒/g, '')
+        .replace(/：/g, ':') // 替换中文全角冒号为英文半角冒号
+        .replace(/\s*:\s*/g, ':') // 把冒号前后的所有空格直接干掉，变成紧凑的 :
+        .replace(/\s*-\s*/g, '-') // 把连字符前后的所有空格直接干掉，变成紧凑的 -
+        .replace(/\s+/g, ' ') // 把其他地方多余的空格压缩为一个空格
+        .trim()
+    
+    // 如果末尾多了一个冒号（比如去掉了“分”但是没秒），把冒号去掉
+    if (normalized.endsWith(':')) {
+        normalized = normalized.slice(0, -1)
+    }
 
-    const ymd = v.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/)
+    // 支持带时间的完整匹配 YYYY-MM-DD HH:mm:ss 或 YYYY/MM/DD HH:mm:ss (含无秒数的情况)
+    // 注意：这里的正则增加了对冒号前后空格的宽容匹配，例如 20: 10 或 20 : 10
+    const ymdhms = normalized.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})[\sT](\d{1,2})\s*:\s*(\d{1,2})(?:\s*:\s*(\d{1,2}))?(?:\.\d+)?\s*(Z|[+-]\d{2}:?\d{2})?$/i)
+    if (ymdhms) {
+        const d = new Date(
+            Number(ymdhms[1]),
+            Number(ymdhms[2]) - 1,
+            Number(ymdhms[3]),
+            Number(ymdhms[4]),
+            Number(ymdhms[5]),
+            ymdhms[6] ? Number(ymdhms[6]) : 0
+        )
+        // 如果有显式的时区标记（如 Z 或 +08:00），则交由 Date.parse 处理
+        if (ymdhms[7]) {
+            const t = Date.parse(normalized)
+            if (!Number.isNaN(t)) return new Date(t)
+        }
+        return d
+    }
+
+    const ymd = normalized.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/)
     if (ymd) return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))
 
-    const ymdCompact = v.match(/^(\d{4})(\d{2})(\d{2})$/)
+    const ymdCompact = normalized.match(/^(\d{4})(\d{2})(\d{2})$/)
     if (ymdCompact)
         return new Date(
             Number(ymdCompact[1]),
@@ -313,8 +413,13 @@ function tryParseDate(input: string): Date | null {
             Number(ymdCompact[3])
         )
 
-    const dmy = v.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/)
+
+
+    const dmy = normalized.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/)
     if (dmy) return new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]))
+
+    const t = Date.parse(normalized)
+    if (!Number.isNaN(t)) return new Date(t)
 
     return null
 }
@@ -335,6 +440,7 @@ export function applyCleaningRules(input: DataTable, rules: CleaningRules): Clea
         filledForwardBackwardCells: 0,
         removedDuplicates: 0,
         formattedDateCells: 0,
+        formattedCurrencyCells: 0,
         normalizedPhoneCells: 0,
         normalizedEmailCells: 0,
         cleanedTextCells: 0,
@@ -388,7 +494,7 @@ export function applyCleaningRules(input: DataTable, rules: CleaningRules): Clea
 
     if (rules.columns.split.enabled && rules.columns.split.column) {
         const from = rules.columns.split.column
-        const into = rules.columns.split.into.filter((n) => n.trim()).map((n) => n.trim())
+        const into = rules.columns.split.into.map((n) => n.trim()).filter((n) => n)
         if (data.columns.includes(from) && into.length) {
             const sep = rules.columns.split.separator
             const nextColumns = [...data.columns]
@@ -422,23 +528,34 @@ export function applyCleaningRules(input: DataTable, rules: CleaningRules): Clea
         if (into && cols.length) {
             const sep = rules.columns.merge.separator
             const nextColumns = data.columns.includes(into) ? [...data.columns] : [...data.columns, into]
+            let mergedCount = 0
             data = {
                 columns: nextColumns,
                 rows: data.rows.map((row) => {
                     const next: DataRow = { ...row }
-                    next[into] = cols.map((c) => row[c] ?? '').join(sep)
+                    // 过滤掉空值（空字符串、null、undefined），然后再 join
+                    const validVals = cols
+                        .map((c) => row[c])
+                        .filter((v) => v !== null && v !== undefined && String(v).trim() !== '')
+                    
+                    next[into] = validVals.length > 0 ? validVals.join(sep) : ''
+                    if (validVals.length > 0) mergedCount += 1
+                    
                     if (rules.columns.merge.dropSources) cols.forEach((c) => delete next[c])
                     return next
                 })
             }
-            stats.mergedColumnsAdded = data.columns.includes(into) ? 0 : 1
+            stats.mergedColumnsAdded = mergedCount > 0 ? 1 : 0
             if (rules.columns.merge.dropSources) {
+                // 不计算 target column
+                const actualDropped = cols.filter(c => c !== into).length
                 data.columns = data.columns.filter((c) => c === into || !cols.includes(c))
-                stats.droppedColumns += cols.length
+                stats.droppedColumns += actualDropped
             }
         }
     }
 
+    // 当 rules.format.text 没有 enable 时，完全不执行文本清理逻辑
     if (rules.format.text.enabled) {
         const cols =
             rules.format.text.columnsMode === 'selected'
@@ -450,6 +567,9 @@ export function applyCleaningRules(input: DataTable, rules: CleaningRules): Clea
                 const next: DataRow = { ...row }
                 cols.forEach((c) => {
                     const raw = next[c] ?? ''
+                    // 如果原值就是纯空值，没必要进行 text trim 等操作，直接跳过
+                    if (raw === '' || raw === null) return
+                    
                     let v = raw
                     if (rules.format.text.removeAllWhitespace) {
                         v = v.replace(/\s+/g, '')
@@ -490,19 +610,47 @@ export function applyCleaningRules(input: DataTable, rules: CleaningRules): Clea
 
     if (rules.format.phone.enabled) {
         const cols = rules.format.phone.columns.filter((c) => data.columns.includes(c))
-        const cc = rules.format.phone.countryCode.replace(/[^\d]/g, '').trim()
+        // countryCode 可能为空
+        const cc = (rules.format.phone.countryCode || '').replace(/[^\d]/g, '').trim()
         data = {
             ...data,
             rows: data.rows.map((row) => {
                 const next: DataRow = { ...row }
                 cols.forEach((c) => {
                     const raw = next[c] ?? ''
-                    const digits = raw.replace(/[^\d]/g, '')
+                    
+                    // 去除原值中可能已有的 + 及其紧跟的国家码（例如 +86、+(86)、+ 86）
+                    // 避免用户选了 E164 后，原值自带的 86 和新加的 86 重复
+                    let cleanedRaw = raw
+                    
+                    // 1. 无论是否有配置 cc，先尝试剥离所有带 + 号或括号的通用国际区号（如 +86, (+86), +1 等）
+                    const genericRegex = /^\s*(?:\+\s*\d+|\+\s*\(\s*\d+\s*\)|\(\s*\+?\d+\s*\))\s*/
+                    let prev = ''
+                    while (cleanedRaw !== prev) {
+                        prev = cleanedRaw
+                        cleanedRaw = cleanedRaw.replace(genericRegex, '')
+                    }
+
+                    // 2. 如果配置了特定的 cc，还要剥离那些没有带 + 号但正好等于 cc 的前缀（如 86138... 去掉 86）
+                    if (cc) {
+                        const specificRegex = new RegExp(`^\\s*${cc}\\s*`, 'i')
+                        prev = ''
+                        while (cleanedRaw !== prev) {
+                            prev = cleanedRaw
+                            cleanedRaw = cleanedRaw.replace(specificRegex, '')
+                        }
+                    }
+
+                    // 3. 去除可能残留的单纯 + 号
+                    cleanedRaw = cleanedRaw.replace(/^\s*\+?\s*/, '')
+                    
+                    const digits = cleanedRaw.replace(/[^\d]/g, '')
                     if (!digits) return
-                    const v =
-                        rules.format.phone.output === 'E164' && cc
-                            ? `+${cc}${digits}`
-                            : digits
+                    
+                    let v = digits
+                    if (rules.format.phone.output === 'E164') {
+                        v = cc ? `+${cc}${digits}` : `+${digits}`
+                    }
                     if (v !== raw) {
                         next[c] = v
                         stats.normalizedPhoneCells += 1
@@ -533,6 +681,42 @@ export function applyCleaningRules(input: DataTable, rules: CleaningRules): Clea
                     if (v !== raw) {
                         next[c] = v
                         stats.formattedDateCells += 1
+                    }
+                })
+                return next
+            })
+        }
+    }
+
+    if (rules.format.currency.enabled) {
+        const cols = rules.format.currency.columns.filter((c) => data.columns.includes(c))
+        const sym = rules.format.currency.symbol
+        const dec = rules.format.currency.decimalPlaces
+        const thou = rules.format.currency.thousandsSeparator
+        
+        data = {
+            ...data,
+            rows: data.rows.map((row) => {
+                const next: DataRow = { ...row }
+                cols.forEach((c) => {
+                    const raw = next[c] ?? ''
+                    // 先把原字符串中的所有千分位逗号和空白字符去掉，避免影响正则匹配和 parseFloat
+                    const cleanedRaw = raw.replace(/,/g, '').replace(/\s+/g, '')
+                    const match = cleanedRaw.match(/[-+]?\d*\.?\d+/)
+                    if (!match) return
+                    const num = parseFloat(match[0])
+                    if (isNaN(num)) return
+                    
+                    const parts = num.toFixed(dec).split('.')
+                    let intPart = parts[0]
+                    if (thou) {
+                        intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+                    }
+                    const v = `${sym}${intPart}${parts.length > 1 ? '.' + parts[1] : ''}`
+                    
+                    if (v !== raw) {
+                        next[c] = v
+                        stats.formattedCurrencyCells = (stats.formattedCurrencyCells || 0) + 1
                     }
                 })
                 return next
@@ -578,7 +762,6 @@ export function applyCleaningRules(input: DataTable, rules: CleaningRules): Clea
                 }
                 if (lastNonEmpty == null) return
                 if (limit != null && since >= limit) {
-                    since += 1
                     return
                 }
                 row[c] = lastNonEmpty
@@ -599,7 +782,6 @@ export function applyCleaningRules(input: DataTable, rules: CleaningRules): Clea
                 }
                 if (nextNonEmpty == null) continue
                 if (limit != null && since >= limit) {
-                    since += 1
                     continue
                 }
                 data.rows[i][c] = nextNonEmpty
@@ -619,37 +801,52 @@ export function applyCleaningRules(input: DataTable, rules: CleaningRules): Clea
         })
     }
 
-    if (rules.missing.removeEmptyRows) {
-        const before = data.rows.length
-        data = {
-            ...data,
-            rows: data.rows.filter((row) => {
-                return !data.columns.every((c) =>
-                    isEmptyCell(row[c] ?? '', rules.missing.trimWhitespaceForEmptyCheck)
-                )
+    if (rules.missing.removeEmptyRows.enabled) {
+        const cond = rules.missing.removeEmptyRows.condition
+        const mode = rules.missing.removeEmptyRows.columnsMode
+        const targetCols = mode === 'custom' && rules.missing.removeEmptyRows.columns.length > 0
+            ? rules.missing.removeEmptyRows.columns.filter(c => data.columns.includes(c))
+            : data.columns
+
+        if (targetCols.length > 0) {
+            const trim = rules.missing.trimWhitespaceForEmptyCheck
+            const filtered = data.rows.filter((row) => {
+                const vals = targetCols.map((c) => row[c] ?? '')
+                if (cond === 'all') {
+                    const allEmpty = vals.every((v) => isEmptyCell(v, trim))
+                    return !allEmpty
+                } else {
+                    const anyEmpty = vals.some((v) => isEmptyCell(v, trim))
+                    return !anyEmpty
+                }
             })
+            stats.removedEmptyRows = data.rows.length - filtered.length
+            data.rows = filtered
         }
-        stats.removedEmptyRows = before - data.rows.length
     }
 
-    if (rules.missing.removeEmptyCols) {
-        const before = data.columns.length
-        const keep = data.columns.filter((c) => {
-            return !data.rows.every((row) =>
-                isEmptyCell(row[c] ?? '', rules.missing.trimWhitespaceForEmptyCheck)
-            )
-        })
-        if (keep.length !== data.columns.length) {
-            data = {
-                columns: keep,
-                rows: data.rows.map((row) => {
-                    const next: DataRow = {}
-                    keep.forEach((c) => (next[c] = row[c] ?? ''))
-                    return next
-                })
+    if (rules.columns.removeEmptyCols.enabled) {
+        const cond = rules.columns.removeEmptyCols.condition
+        const trim = rules.missing.trimWhitespaceForEmptyCheck
+        const colsToKeep = data.columns.filter((c) => {
+            const vals = data.rows.map((r) => r[c] ?? '')
+            if (cond === 'all') {
+                const allEmpty = vals.every((v) => isEmptyCell(v, trim))
+                return !allEmpty
+            } else {
+                const anyEmpty = vals.some((v) => isEmptyCell(v, trim))
+                return !anyEmpty
             }
-            stats.removedEmptyCols = before - keep.length
-        }
+        })
+        stats.removedEmptyCols = data.columns.length - colsToKeep.length
+        data.columns = colsToKeep
+        data.rows = data.rows.map((row) => {
+            const next: DataRow = {}
+            colsToKeep.forEach((c) => {
+                next[c] = row[c]
+            })
+            return next
+        })
     }
 
     if (rules.dedup.enabled) {

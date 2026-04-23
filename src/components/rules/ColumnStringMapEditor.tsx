@@ -1,6 +1,4 @@
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
-
 interface ColumnStringMapEditorProps {
     columns: string[]
     value: Record<string, string>
@@ -19,7 +17,7 @@ export function ColumnStringMapEditor({
     disabled
 }: ColumnStringMapEditorProps) {
     return (
-        <ScrollArea className="h-44 border rounded-xl bg-card p-2">
+        <div className="h-44 border rounded-xl bg-card p-2 overflow-y-auto">
             {columns.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                     {emptyText}
@@ -47,7 +45,7 @@ export function ColumnStringMapEditor({
                     ))}
                 </div>
             )}
-        </ScrollArea>
+        </div>
     )
 }
 

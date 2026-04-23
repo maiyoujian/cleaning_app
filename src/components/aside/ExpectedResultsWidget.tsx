@@ -28,18 +28,20 @@ export function ExpectedResultsWidget({ rules, table }: ExpectedResultsWidgetPro
         })
     }
     
-    if (rules.missing.removeEmptyRows) {
+    if (rules.missing.removeEmptyRows.enabled) {
+        const mode = rules.missing.removeEmptyRows.columnsMode === 'custom' ? '指定列' : '全部列'
+        const cond = rules.missing.removeEmptyRows.condition === 'all' ? '都为空' : '任意为空'
         activeActions.push({
             label: '删除空行',
-            desc: '删除包含空值的行',
+            desc: `当${mode}${cond}时删除该行`,
             type: 'danger'
         })
     }
     
-    if (rules.missing.removeEmptyCols) {
+    if (rules.columns.removeEmptyCols.enabled) {
         activeActions.push({
             label: '删除空列',
-            desc: '删除包含空值的列',
+            desc: rules.columns.removeEmptyCols.condition === 'all' ? '删除全部行都为空的列' : '删除任意行为空的列',
             type: 'danger'
         })
     }
@@ -62,12 +64,13 @@ export function ExpectedResultsWidget({ rules, table }: ExpectedResultsWidgetPro
         })
     }
     
-    if (rules.format.date.enabled || rules.format.phone.enabled || rules.format.email.enabled || rules.format.text.enabled) {
+    if (rules.format.date.enabled || rules.format.phone.enabled || rules.format.email.enabled || rules.format.text.enabled || rules.format.currency.enabled) {
         const formats = []
         if (rules.format.date.enabled) formats.push('日期')
         if (rules.format.phone.enabled) formats.push('手机号')
         if (rules.format.email.enabled) formats.push('邮箱')
         if (rules.format.text.enabled) formats.push('文本')
+        if (rules.format.currency.enabled) formats.push('金额')
         
         activeActions.push({
             label: '数据格式化',
@@ -94,9 +97,7 @@ export function ExpectedResultsWidget({ rules, table }: ExpectedResultsWidgetPro
 
     return (
         <div className="pt-5 border-t border-gray-200/60">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-gray-900">预计结果</h3>
-            </div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">预计结果</h3>
             
             {activeActions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-6 px-4 bg-slate-50 rounded-lg border border-slate-100 border-dashed text-center mb-4">
@@ -104,23 +105,21 @@ export function ExpectedResultsWidget({ rules, table }: ExpectedResultsWidgetPro
                     <div className="text-xs text-slate-500">请在左侧配置需要执行的清洗操作</div>
                 </div>
             ) : (
-                <div className="space-y-3 mb-6">
+                <div className="flex flex-col gap-3 mb-6">
                     <p className="text-xs text-gray-500 leading-relaxed">以下规则将在清洗时执行：</p>
                     <div className="flex flex-col gap-2">
                         {activeActions.map((action, idx) => (
                             <div key={idx} className="flex flex-col bg-white border border-gray-100 shadow-sm rounded-lg p-2.5">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Badge 
-                                        variant="secondary" 
-                                        className={`px-1.5 py-0 text-[10px] ${
-                                            action.type === 'danger' ? 'bg-red-50 text-red-600 border-red-100' :
-                                            action.type === 'warning' ? 'bg-orange-50 text-orange-600 border-orange-100' :
-                                            'bg-blue-50 text-blue-600 border-blue-100'
-                                        }`}
-                                    >
-                                        {action.label}
-                                    </Badge>
-                                </div>
+                                <Badge 
+                                    variant="secondary" 
+                                    className={`w-fit mb-1 px-1.5 py-0 text-[10px] ${
+                                        action.type === 'danger' ? 'bg-red-50 text-red-600 border-red-100' :
+                                        action.type === 'warning' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                        'bg-blue-50 text-blue-600 border-blue-100'
+                                    }`}
+                                >
+                                    {action.label}
+                                </Badge>
                                 <span className="text-xs text-gray-600">{action.desc}</span>
                             </div>
                         ))}
@@ -128,7 +127,7 @@ export function ExpectedResultsWidget({ rules, table }: ExpectedResultsWidgetPro
                 </div>
             )}
 
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                         <span className="size-2 rounded-full bg-blue-500"></span>
