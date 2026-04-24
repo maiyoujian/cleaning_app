@@ -86,22 +86,49 @@ function App() {
             setParsingError(null)
             setTable(null)
 
-            if (active.file.size === 0) {
-                setParsingError(
-                    '当前文件内容为空。若为桌面拖拽文件，请接入 Tauri 后端读取本地文件内容。'
-                )
-                return
+            let isTauriEnv = false
+            try {
+                isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+            } catch (e) {
+                isTauriEnv = false
             }
 
-            try {
-                const next = await parseSpreadsheetFile(active.file)
-                if (next.columns.length === 0) {
+            // Web fallback (如果不是 Tauri，或者是没有 path 的文件)
+            if (!isTauriEnv || !active.path) {
+                if (active.file.size === 0) {
                     setParsingError(
-                        '未检测到表头或数据为空，请确认首行是表头。'
+                        '当前文件内容为空。若为桌面拖拽文件，请接入 Tauri 后端读取本地文件内容。'
                     )
                     return
                 }
-                setTable(next)
+
+                try {
+                    const next = await parseSpreadsheetFile(active.file)
+                    if (next.columns.length === 0) {
+                        setParsingError(
+                            '未检测到表头或数据为空，请确认首行是表头。'
+                        )
+                        return
+                    }
+                    setTable(next)
+                } catch (e) {
+                    const msg = e instanceof Error ? e.message : String(e)
+                    setParsingError(msg)
+                }
+                return
+            }
+
+            // Tauri 环境，走 Rust 后端读取
+            try {
+                const resultJson = await invoke<string>('run_rust_cleaner', {
+                    filePath: active.path,
+                    rulesJson: "{}" // 空规则，只为了获取原始数据和表头
+                })
+                const res = JSON.parse(resultJson)
+                setTable({
+                    columns: res.data.columns,
+                    rows: res.data.rows
+                })
             } catch (e) {
                 const msg = e instanceof Error ? e.message : String(e)
                 setParsingError(msg)
@@ -119,16 +146,10 @@ function App() {
 
         setIsProcessing(true)
         try {
-            // 尝试通过 Tauri IPC 调用 Rust -> Python 的最佳实践链路
-            // 检查是否有真实路径（桌面端拖拽或通过 dialog 选择时应该有真实路径，这里假设存在 path 属性）
-            // 在实际的 Tauri v2 开发中，通常使用 @tauri-apps/plugin-dialog 获取文件绝对路径
-            // 但如果是在纯 Web 环境测试，或者拿不到绝对路径，则降级使用 TypeScript 版本的 mock 逻辑
-            
             let resultData: CleaningResult | null = null
             let isTauriEnv = false
             
             try {
-                // 探测是否在 Tauri 环境中
                 isTauriEnv = !!(window as any).__TAURI_INTERNALS__
             } catch (e) {
                 isTauriEnv = false
@@ -136,16 +157,15 @@ function App() {
 
             if (isTauriEnv && active.path) {
                 try {
-                    console.log('正在调用 Tauri Rust 后端与 Python...')
+                    console.log('正在调用 Tauri Rust 原生后端...')
                     const rulesJson = JSON.stringify(activeRules)
-                    const resultJson = await invoke<string>('run_python_cleaner', {
+                    const resultJson = await invoke<string>('run_rust_cleaner', {
                         filePath: active.path,
                         rulesJson: rulesJson
                     })
                     resultData = JSON.parse(resultJson) as CleaningResult
                 } catch (err) {
-                    console.error('Python 后端执行失败，回退到前端 Mock 逻辑:', err)
-                    // 后端执行失败，降级回退
+                    console.error('Rust 后端执行失败，回退到前端 Mock 逻辑:', err)
                     resultData = applyCleaningRules(table, activeRules)
                 }
             } else {
@@ -200,6 +220,7 @@ function App() {
                         <PreviewViewer
                             activeFile={files.find(f => f.id === activeFileId) ?? null}
                             previewResult={result}
+                            activeRules={activeRules}
                             onBackToRules={() => setCurrentStep(2)}
                             onRestart={handleRestart}
                         />

@@ -19,6 +19,15 @@ data = {
 }
 
 df = pd.DataFrame(data)
+
+# 在第 4 行之后（即原数据中间）插入一个完全空行
+empty_row_df = pd.DataFrame([[pd.NA] * len(df.columns)], columns=df.columns)
+df = pd.concat([df.iloc[:4], empty_row_df, df.iloc[4:]], ignore_index=True)
+# 在第 4 行之后（即原数据中间）插入一个完全空行
+empty_row_df = pd.DataFrame([[pd.NA] * len(df.columns)], columns=df.columns)
+df = pd.concat([df.iloc[:0], empty_row_df, df.iloc[0:]], ignore_index=True)
+
+# 在表格绝对末尾再追加一个完全空行
 df.loc[len(df)] = [pd.NA] * len(df.columns)
 
 df.to_csv("test_dirty_data.csv", index=False)

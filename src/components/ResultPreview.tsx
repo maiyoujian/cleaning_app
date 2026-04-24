@@ -26,7 +26,7 @@ export function ResultPreview({ result }: ResultPreviewProps) {
                             {previewColumns.map((c) => (
                                 <TableHead
                                     key={c}
-                                    className="whitespace-nowrap px-3 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider h-auto border-r border-b border-slate-200 last:border-r-0 bg-slate-50/95 bg-clip-padding"
+                                    className="whitespace-nowrap px-3 py-4 text-xs font-semibold text-slate-600 tracking-wider h-auto border-r border-b border-slate-200 last:border-r-0 bg-slate-50/95 bg-clip-padding"
                                 >
                                     {c}
                                 </TableHead>

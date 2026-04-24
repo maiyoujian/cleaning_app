@@ -302,6 +302,7 @@ export async function parseSpreadsheetFile(file: File): Promise<DataTable> {
         const wb = XLSX.read(buffer, { type: 'array' })
         const firstSheetName = wb.SheetNames[0]
         const sheet = wb.Sheets[firstSheetName]
+        // 修复 SheetJS 默认丢弃空行的 bug
         const aoa = XLSX.utils.sheet_to_json(sheet, {
             header: 1,
             blankrows: true,
@@ -455,27 +456,7 @@ export function applyCleaningRules(input: DataTable, rules: CleaningRules): Clea
         rows: input.rows.map((r) => ({ ...r }))
     }
 
-    if (rules.columns.rename.enabled && rules.columns.rename.mappings.length) {
-        const mapping = new Map(
-            rules.columns.rename.mappings
-                .filter((m) => m.from.trim() && m.to.trim())
-                .map((m) => [m.from.trim(), m.to.trim()])
-        )
-        if (mapping.size) {
-            data = {
-                columns: data.columns.map((c) => mapping.get(c) ?? c),
-                rows: data.rows.map((row) => {
-                    const next: DataRow = {}
-                    data.columns.forEach((col) => {
-                        const newKey = mapping.get(col) ?? col
-                        next[newKey] = row[col] ?? ''
-                    })
-                    return next
-                })
-            }
-            stats.renamedColumns = mapping.size
-        }
-    }
+
 
     if (rules.columns.drop.enabled && rules.columns.drop.columns.length) {
         const toDrop = new Set(rules.columns.drop.columns)
@@ -878,6 +859,28 @@ export function applyCleaningRules(input: DataTable, rules: CleaningRules): Clea
 
         data = { ...data, rows: data.rows.filter((_, idx) => keepIdx.has(idx)) }
         stats.removedDuplicates = before - data.rows.length
+    }
+
+    if (rules.columns.rename.enabled && rules.columns.rename.mappings.length) {
+        const mapping = new Map(
+            rules.columns.rename.mappings
+                .filter((m) => m.from.trim() && m.to.trim())
+                .map((m) => [m.from.trim(), m.to.trim()])
+        )
+        if (mapping.size) {
+            data = {
+                columns: data.columns.map((c) => mapping.get(c) ?? c),
+                rows: data.rows.map((row) => {
+                    const next: DataRow = {}
+                    data.columns.forEach((col) => {
+                        const newKey = mapping.get(col) ?? col
+                        next[newKey] = row[col] ?? ''
+                    })
+                    return next
+                })
+            }
+            stats.renamedColumns = mapping.size
+        }
     }
 
     stats.rowsAfter = data.rows.length

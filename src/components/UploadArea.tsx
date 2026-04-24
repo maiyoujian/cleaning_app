@@ -9,6 +9,7 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { open } from '@tauri-apps/plugin-dialog'
 
 export type FileStatus = 'reading' | 'success' | 'error'
 
@@ -42,6 +43,13 @@ export function UploadArea({
         if (!zone) return
 
         const handleDragOverWindow = (e: DragEvent) => {
+            let isTauriEnv = false
+            try {
+                isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+            } catch (err) {
+                isTauriEnv = false
+            }
+            if (isTauriEnv) return // Tauri 环境交给原生处理
             e.preventDefault()
             e.stopPropagation()
             if (e.dataTransfer) {
@@ -50,6 +58,22 @@ export function UploadArea({
         }
 
         const handleDropWindow = async (e: DragEvent) => {
+            let isTauriEnv = false
+            try {
+                isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+            } catch (err) {
+                isTauriEnv = false
+            }
+
+            if (isTauriEnv) {
+                // 如果是 Tauri 环境，让 setupTauriDragAndDrop (原生监听器) 处理，避免重复添加
+                e.preventDefault()
+                e.stopPropagation()
+                setIsDragging(false)
+                dragCounter.current = 0
+                return
+            }
+
             e.preventDefault()
             e.stopPropagation()
             setIsDragging(false)
@@ -125,11 +149,35 @@ export function UploadArea({
             })
 
             if (validFiles.length > 0) {
-                addFiles(validFiles.map((file) => ({ file })))
+                const newItems = validFiles.map((file) => {
+                    const path = (file as any).path
+                    return { file, path }
+                })
+                
+                setSelectedFiles(prev => {
+                    const existingPaths = prev.map(f => f.path).filter(Boolean)
+                    const uniqueNewItems = newItems.filter(item => !item.path || !existingPaths.includes(item.path))
+                    if (uniqueNewItems.length === 0) return prev
+                    
+                    const itemsToAdd = uniqueNewItems.map(({ file, path }) => ({
+                        file,
+                        path,
+                        status: 'success' as const,
+                        id: Math.random().toString(36).substring(7)
+                    }))
+                    return [...prev, ...itemsToAdd]
+                })
             }
         }
 
         const handleDragEnterZone = (e: DragEvent) => {
+            let isTauriEnv = false
+            try {
+                isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+            } catch (err) {
+                isTauriEnv = false
+            }
+            if (isTauriEnv) return // Tauri 环境交给原生处理
             e.preventDefault()
             e.stopPropagation()
             dragCounter.current++
@@ -137,6 +185,13 @@ export function UploadArea({
         }
 
         const handleDragLeaveZone = (e: DragEvent) => {
+            let isTauriEnv = false
+            try {
+                isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+            } catch (err) {
+                isTauriEnv = false
+            }
+            if (isTauriEnv) return // Tauri 环境交给原生处理
             e.preventDefault()
             e.stopPropagation()
             dragCounter.current--
@@ -167,16 +222,7 @@ export function UploadArea({
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
     }
 
-    const addFiles = (items: Array<{ file: File; path?: string }>) => {
-        const newFiles: SelectedFile[] = items.map(({ file, path }) => ({
-            file,
-            path,
-            status: 'success' as const,
-            id: Math.random().toString(36).substring(7)
-        }))
 
-        setSelectedFiles((prev) => [...prev, ...newFiles])
-    }
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -189,7 +235,26 @@ export function UploadArea({
                 )
             })
             if (validFiles.length > 0) {
-                addFiles(validFiles.map((file) => ({ file })))
+                // 获取本地文件绝对路径 (通过 e.target.files[i].path)
+                // 只有在 Tauri (Electron 等壳子) 里，File 对象才可能带有 .path 属性
+                const newItems = validFiles.map((file) => {
+                    const path = (file as any).path
+                    return { file, path }
+                })
+                
+                setSelectedFiles(prev => {
+                    const existingPaths = prev.map(f => f.path).filter(Boolean)
+                    const uniqueNewItems = newItems.filter(item => !item.path || !existingPaths.includes(item.path))
+                    if (uniqueNewItems.length === 0) return prev
+                    
+                    const itemsToAdd = uniqueNewItems.map(({ file, path }) => ({
+                        file,
+                        path,
+                        status: 'success' as const,
+                        id: Math.random().toString(36).substring(7)
+                    }))
+                    return [...prev, ...itemsToAdd]
+                })
             }
             if (fileInputRef.current) {
                 fileInputRef.current.value = ''
@@ -203,6 +268,15 @@ export function UploadArea({
         let unlisten: (() => void) | undefined
 
         const setupTauriDragAndDrop = async () => {
+            let isTauriEnv = false
+            try {
+                isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+            } catch (e) {
+                isTauriEnv = false
+            }
+
+            if (!isTauriEnv) return
+
             try {
                 unlisten = await getCurrentWindow().onDragDropEvent((event) => {
                     if (event.payload.type === 'enter') {
@@ -223,12 +297,24 @@ export function UploadArea({
                             })
 
                             if (validPaths.length > 0) {
-                                const newItems = validPaths.map((path) => {
-                                    const name =
-                                        path.split(/[\\/]/).pop() || path
-                                    return { file: new File([], name), path }
+                                // 在这里去重，防止相同路径被重复添加
+                                setSelectedFiles((prev) => {
+                                    const existingPaths = prev.map(f => f.path).filter(Boolean)
+                                    const uniqueNewPaths = validPaths.filter(p => !existingPaths.includes(p))
+                                    
+                                    if (uniqueNewPaths.length === 0) return prev
+
+                                    const newItems = uniqueNewPaths.map((path) => {
+                                        const name = path.split(/[\\/]/).pop() || path
+                                        return { 
+                                            file: new File([], name), 
+                                            path,
+                                            status: 'success' as const,
+                                            id: Math.random().toString(36).substring(7)
+                                        }
+                                    })
+                                    return [...prev, ...newItems]
                                 })
-                                addFiles(newItems)
                             }
                         }
                     }
@@ -247,8 +333,51 @@ export function UploadArea({
         }
     }, [])
 
-    const handleClick = () => {
-        fileInputRef.current?.click()
+    const handleClick = async () => {
+        let isTauriEnv = false
+        try {
+            isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+        } catch (e) {
+            isTauriEnv = false
+        }
+
+        if (isTauriEnv) {
+            try {
+                const selected = await open({
+                    multiple: true,
+                    filters: [{
+                        name: 'Spreadsheet',
+                        extensions: ['csv', 'xlsx', 'xls']
+                    }]
+                })
+                if (selected) {
+                    const paths = Array.isArray(selected) ? selected : [selected]
+                    const newItems = paths.map((path: any) => {
+                        const pathStr = typeof path === 'string' ? path : path.path
+                        const name = pathStr.split(/[\\/]/).pop() || pathStr
+                        return { file: new File([], name), path: pathStr }
+                    })
+                    
+                    setSelectedFiles(prev => {
+                        const existingPaths = prev.map(f => f.path).filter(Boolean)
+                        const uniqueNewItems = newItems.filter(item => !existingPaths.includes(item.path))
+                        if (uniqueNewItems.length === 0) return prev
+                        
+                        const itemsToAdd = uniqueNewItems.map(({ file, path }) => ({
+                            file,
+                            path,
+                            status: 'success' as const,
+                            id: Math.random().toString(36).substring(7)
+                        }))
+                        return [...prev, ...itemsToAdd]
+                    })
+                }
+            } catch (error) {
+                console.error('打开文件选择器失败:', error)
+            }
+        } else {
+            fileInputRef.current?.click()
+        }
     }
 
     const handleRemoveFile = (id: string, e: React.MouseEvent) => {
@@ -323,7 +452,7 @@ export function UploadArea({
                         size="sm"
                         onClick={(e) => {
                             e.stopPropagation()
-                            fileInputRef.current?.click()
+                            handleClick()
                         }}
                     >
                         选择文件
@@ -379,7 +508,7 @@ export function UploadArea({
                                         </span>
                                         <div className="flex flex-wrap items-center gap-2.5 text-[11px] text-gray-500">
                                             <span>
-                                                {formatFileSize(item.file.size)}
+                                                {item.file.size > 0 ? formatFileSize(item.file.size) : '本地文件'}
                                             </span>
                                             <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
                                             {item.status === 'reading' && (

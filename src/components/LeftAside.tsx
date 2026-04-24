@@ -82,9 +82,49 @@ export function LeftAside({
                     variant="outline" 
                     size="sm" 
                     className="w-full text-xs flex items-center justify-center gap-2 cursor-pointer"
-                    onClick={() => {
-                        const fileInput = sidebarRef.current?.querySelector('input[type="file"][multiple]') as HTMLInputElement
-                        if (fileInput) fileInput.click()
+                    onClick={async () => {
+                        let isTauriEnv = false
+                        try {
+                            isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+                        } catch (e) {
+                            isTauriEnv = false
+                        }
+                        
+                        if (isTauriEnv) {
+                            try {
+                                const { open } = await import('@tauri-apps/plugin-dialog')
+                                const selected = await open({
+                                    multiple: true,
+                                    filters: [{
+                                        name: 'Spreadsheet',
+                                        extensions: ['csv', 'xlsx', 'xls']
+                                    }]
+                                })
+                                if (selected) {
+                                    const paths = Array.isArray(selected) ? selected : [selected]
+                                    const newItems = paths.map((path: any) => {
+                                        const pathStr = typeof path === 'string' ? path : path.path
+                                        const name = pathStr.split(/[\\/]/).pop() || pathStr
+                                        return {
+                                            file: new File([], name),
+                                            path: pathStr,
+                                            status: 'success' as const,
+                                            id: Math.random().toString(36).substring(7)
+                                        }
+                                    })
+                                    setFiles(prev => {
+                                        const existingPaths = prev.map(f => f.path).filter(Boolean)
+                                        const uniqueNewItems = newItems.filter(item => !existingPaths.includes(item.path))
+                                        return [...prev, ...uniqueNewItems]
+                                    })
+                                }
+                            } catch (error) {
+                                console.error('打开文件选择器失败:', error)
+                            }
+                        } else {
+                            const fileInput = sidebarRef.current?.querySelector('input[type="file"][multiple]') as HTMLInputElement
+                            if (fileInput) fileInput.click()
+                        }
                     }}
                 >
                     <FileText className="size-3" />
