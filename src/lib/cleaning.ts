@@ -17,6 +17,8 @@ export type DateOutputFormat =
     | 'YYYY/MM/DD'
     | 'YYYY-MM-DD HH:mm'
     | 'YYYY-MM-DD HH:mm:ss'
+    | 'YYYY/MM/DD HH:mm'
+    | 'YYYY/MM/DD HH:mm:ss'
     | 'YYYY年MM月DD日'
     | 'YYYY年MM月DD日 HH时mm分'
     | 'YYYY年MM月DD日 HH时mm分ss秒'
@@ -349,6 +351,10 @@ function formatDate(date: Date, fmt: DateOutputFormat, tz: TimezoneMode) {
 
     if (fmt === 'ISO') return date.toISOString()
     if (fmt === 'YYYY/MM/DD') return `${year}/${pad2(month)}/${pad2(day)}`
+    if (fmt === 'YYYY/MM/DD HH:mm')
+        return `${year}/${pad2(month)}/${pad2(day)} ${pad2(hours)}:${pad2(minutes)}`
+    if (fmt === 'YYYY/MM/DD HH:mm:ss')
+        return `${year}/${pad2(month)}/${pad2(day)} ${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`
     if (fmt === 'YYYY-MM-DD HH:mm')
         return `${year}-${pad2(month)}-${pad2(day)} ${pad2(hours)}:${pad2(minutes)}`
     if (fmt === 'YYYY-MM-DD HH:mm:ss')

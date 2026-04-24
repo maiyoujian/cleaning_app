@@ -1,6 +1,8 @@
 pub mod models;
 pub mod parser;
 pub mod processor;
+pub mod operations;
+pub mod utils;
 
 use models::CleaningStats;
 use parser::{export_dataframe, read_to_dataframe};

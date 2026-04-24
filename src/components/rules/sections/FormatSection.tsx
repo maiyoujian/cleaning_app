@@ -187,8 +187,10 @@ export function FormatSection({ columns, value, onChange }: FormatSectionProps) 
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
                                         <SelectItem value="YYYY/MM/DD">YYYY/MM/DD</SelectItem>
+                                        <SelectItem value="YYYY/MM/DD HH:mm">YYYY/MM/DD HH:mm</SelectItem>
+                                        <SelectItem value="YYYY/MM/DD HH:mm:ss">YYYY/MM/DD HH:mm:ss</SelectItem>
+                                        <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
                                         <SelectItem value="YYYY-MM-DD HH:mm">YYYY-MM-DD HH:mm</SelectItem>
                                         <SelectItem value="YYYY-MM-DD HH:mm:ss">YYYY-MM-DD HH:mm:ss</SelectItem>
                                         <SelectItem value="YYYY年MM月DD日">YYYY年MM月DD日</SelectItem>
