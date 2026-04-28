@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:mac": "tauri build",
+    "build:win": "tauri build --target x86_64-pc-windows-msvc"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",

@@ -106,7 +106,7 @@ export function PreviewViewer({
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem
                                 className="cursor-pointer"
-                                onClick={(e) => {
+                                onClick={() => {
                                     // 不再调用 e.preventDefault()，让 DropdownMenu 自然关闭
                                     handleNativeExport('csv')
                                 }}
@@ -115,7 +115,7 @@ export function PreviewViewer({
                             </DropdownMenuItem>
                             <DropdownMenuItem
                                 className="cursor-pointer"
-                                onClick={(e) => {
+                                onClick={() => {
                                     handleNativeExport('xlsx')
                                 }}
                             >
@@ -124,7 +124,7 @@ export function PreviewViewer({
                             <div className="h-px bg-gray-200 my-1" />
                             <DropdownMenuItem
                                 className="cursor-pointer text-gray-500"
-                                onClick={(e) => {
+                                onClick={() => {
                                     exportToCSV(
                                         previewResult.data,
                                         activeFile?.file.name
