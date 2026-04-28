@@ -32,3 +32,10 @@ indexmap = { version = "2.2", features = ["serde"] }
 polars = { version = "0.45.1", features = ["lazy", "strings", "regex", "temporal", "csv", "parquet", "json", "dtype-struct"] }
 rust_xlsxwriter = "0.78"
 
+[profile.release]
+opt-level = "s"       # 优化体积（s 或 z）
+lto = true            # 开启链接时优化 (Link Time Optimization)
+codegen-units = 1     # 最大化优化，但编译变慢
+strip = true          # 剥离符号表（大幅减小体积）
+panic = "abort"       # 去掉 panic 展开栈（减小体积）
+
