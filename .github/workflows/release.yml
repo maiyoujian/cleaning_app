@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*' # 只有当你打上类似 v0.1.0 这样的 tag 时才会触发自动打包
 
+permissions:
+  contents: write
+
 jobs:
   build-tauri:
     strategy:
@@ -45,8 +48,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: app-v__VERSION__ # 使用 package.json 中的版本号
-          releaseName: "Excel 脏数据清洗工具 v__VERSION__"
+          tagName: ${{ github.ref_name }}
+          releaseName: "Excel 脏数据清洗工具 ${{ github.ref_name }}"
           releaseBody: "See the assets to download this version and install."
           releaseDraft: true
           prerelease: false
