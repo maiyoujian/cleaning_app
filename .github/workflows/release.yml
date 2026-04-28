@@ -14,9 +14,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # 只打包 Windows 纯净版（生成独立的 .exe 和免安装目录）
           - platform: "windows-latest"
-            args: ""
+            target: "x86_64-pc-windows-msvc"
+            os_name: "windows"
+          - platform: "macos-latest"
+            target: "aarch64-apple-darwin" # M1/M2/M3
+            os_name: "macos-arm64"
+          - platform: "macos-latest"
+            target: "x86_64-apple-darwin" # Intel Mac
+            os_name: "macos-x64"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -32,7 +38,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc
+          targets: ${{ matrix.target }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -53,4 +59,28 @@ jobs:
           releaseBody: "See the assets to download this version and install."
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          args: "--target ${{ matrix.target }}"
+
+      # 将绿色免安装文件打包为 zip
+      - name: Zip portable binary (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          cd src-tauri/target/${{ matrix.target }}/release
+          Compress-Archive -Path "cleaning_app.exe" -DestinationPath "cleaning_app_${{ matrix.os_name }}_portable.zip"
+
+      - name: Zip portable app (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cd src-tauri/target/${{ matrix.target }}/release/bundle/macos
+          zip -r "cleaning_app_${{ matrix.os_name }}_portable.zip" "Excel 脏数据清洗工具.app"
+
+      # 上传绿色免安装版 zip 到 Github Releases
+      - name: Upload portable zip to Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            src-tauri/target/${{ matrix.target }}/release/cleaning_app_${{ matrix.os_name }}_portable.zip
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/cleaning_app_${{ matrix.os_name }}_portable.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
