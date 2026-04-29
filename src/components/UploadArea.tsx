@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { open } from '@tauri-apps/plugin-dialog'
+import { openUrl } from '@tauri-apps/plugin-opener'
 
 export type FileStatus = 'reading' | 'success' | 'error'
 
@@ -153,12 +154,17 @@ export function UploadArea({
                     const path = (file as any).path
                     return { file, path }
                 })
-                
-                setSelectedFiles(prev => {
-                    const existingPaths = prev.map(f => f.path).filter(Boolean)
-                    const uniqueNewItems = newItems.filter(item => !item.path || !existingPaths.includes(item.path))
+
+                setSelectedFiles((prev) => {
+                    const existingPaths = prev
+                        .map((f) => f.path)
+                        .filter(Boolean)
+                    const uniqueNewItems = newItems.filter(
+                        (item) =>
+                            !item.path || !existingPaths.includes(item.path)
+                    )
                     if (uniqueNewItems.length === 0) return prev
-                    
+
                     const itemsToAdd = uniqueNewItems.map(({ file, path }) => ({
                         file,
                         path,
@@ -222,8 +228,6 @@ export function UploadArea({
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
     }
 
-
-
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             const validFiles = Array.from(e.target.files).filter((file) => {
@@ -241,12 +245,17 @@ export function UploadArea({
                     const path = (file as any).path
                     return { file, path }
                 })
-                
-                setSelectedFiles(prev => {
-                    const existingPaths = prev.map(f => f.path).filter(Boolean)
-                    const uniqueNewItems = newItems.filter(item => !item.path || !existingPaths.includes(item.path))
+
+                setSelectedFiles((prev) => {
+                    const existingPaths = prev
+                        .map((f) => f.path)
+                        .filter(Boolean)
+                    const uniqueNewItems = newItems.filter(
+                        (item) =>
+                            !item.path || !existingPaths.includes(item.path)
+                    )
                     if (uniqueNewItems.length === 0) return prev
-                    
+
                     const itemsToAdd = uniqueNewItems.map(({ file, path }) => ({
                         file,
                         path,
@@ -299,20 +308,30 @@ export function UploadArea({
                             if (validPaths.length > 0) {
                                 // 在这里去重，防止相同路径被重复添加
                                 setSelectedFiles((prev) => {
-                                    const existingPaths = prev.map(f => f.path).filter(Boolean)
-                                    const uniqueNewPaths = validPaths.filter(p => !existingPaths.includes(p))
-                                    
+                                    const existingPaths = prev
+                                        .map((f) => f.path)
+                                        .filter(Boolean)
+                                    const uniqueNewPaths = validPaths.filter(
+                                        (p) => !existingPaths.includes(p)
+                                    )
+
                                     if (uniqueNewPaths.length === 0) return prev
 
-                                    const newItems = uniqueNewPaths.map((path) => {
-                                        const name = path.split(/[\\/]/).pop() || path
-                                        return { 
-                                            file: new File([], name), 
-                                            path,
-                                            status: 'success' as const,
-                                            id: Math.random().toString(36).substring(7)
+                                    const newItems = uniqueNewPaths.map(
+                                        (path) => {
+                                            const name =
+                                                path.split(/[\\/]/).pop() ||
+                                                path
+                                            return {
+                                                file: new File([], name),
+                                                path,
+                                                status: 'success' as const,
+                                                id: Math.random()
+                                                    .toString(36)
+                                                    .substring(7)
+                                            }
                                         }
-                                    })
+                                    )
                                     return [...prev, ...newItems]
                                 })
                             }
@@ -345,30 +364,41 @@ export function UploadArea({
             try {
                 const selected = await open({
                     multiple: true,
-                    filters: [{
-                        name: 'Spreadsheet',
-                        extensions: ['csv', 'xlsx', 'xls']
-                    }]
+                    filters: [
+                        {
+                            name: 'Spreadsheet',
+                            extensions: ['csv', 'xlsx', 'xls']
+                        }
+                    ]
                 })
                 if (selected) {
-                    const paths = Array.isArray(selected) ? selected : [selected]
+                    const paths = Array.isArray(selected)
+                        ? selected
+                        : [selected]
                     const newItems = paths.map((path: any) => {
-                        const pathStr = typeof path === 'string' ? path : path.path
+                        const pathStr =
+                            typeof path === 'string' ? path : path.path
                         const name = pathStr.split(/[\\/]/).pop() || pathStr
                         return { file: new File([], name), path: pathStr }
                     })
-                    
-                    setSelectedFiles(prev => {
-                        const existingPaths = prev.map(f => f.path).filter(Boolean)
-                        const uniqueNewItems = newItems.filter(item => !existingPaths.includes(item.path))
+
+                    setSelectedFiles((prev) => {
+                        const existingPaths = prev
+                            .map((f) => f.path)
+                            .filter(Boolean)
+                        const uniqueNewItems = newItems.filter(
+                            (item) => !existingPaths.includes(item.path)
+                        )
                         if (uniqueNewItems.length === 0) return prev
-                        
-                        const itemsToAdd = uniqueNewItems.map(({ file, path }) => ({
-                            file,
-                            path,
-                            status: 'success' as const,
-                            id: Math.random().toString(36).substring(7)
-                        }))
+
+                        const itemsToAdd = uniqueNewItems.map(
+                            ({ file, path }) => ({
+                                file,
+                                path,
+                                status: 'success' as const,
+                                id: Math.random().toString(36).substring(7)
+                            })
+                        )
                         return [...prev, ...itemsToAdd]
                     })
                 }
@@ -383,6 +413,21 @@ export function UploadArea({
     const handleRemoveFile = (id: string, e: React.MouseEvent) => {
         e.stopPropagation()
         setSelectedFiles((prev) => prev.filter((f) => f.id !== id))
+    }
+
+    const openExternalUrl = async (url: string) => {
+        let isTauriEnv = false
+        try {
+            isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+        } catch (e) {
+            isTauriEnv = false
+        }
+
+        if (isTauriEnv) {
+            await openUrl(url)
+        } else {
+            window.open(url, '_blank', 'noopener,noreferrer')
+        }
     }
 
     if (hideUI) {
@@ -508,7 +553,11 @@ export function UploadArea({
                                         </span>
                                         <div className="flex flex-wrap items-center gap-2.5 text-[11px] text-gray-500">
                                             <span>
-                                                {item.file.size > 0 ? formatFileSize(item.file.size) : '本地文件'}
+                                                {item.file.size > 0
+                                                    ? formatFileSize(
+                                                          item.file.size
+                                                      )
+                                                    : '本地文件'}
                                             </span>
                                             <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
                                             {item.status === 'reading' && (
@@ -544,6 +593,33 @@ export function UploadArea({
                             </div>
                         ))}
                     </div>
+                </div>
+            )}
+            {embedded && selectedFiles.length === 0 && (
+                <div className="mt-8 pt-4 border-t border-gray-100 text-xs text-gray-500 flex items-center justify-center gap-4">
+                    <button
+                        type="button"
+                        className="hover:text-gray-900 transition-colors cursor-pointer"
+                        onClick={() =>
+                            openExternalUrl(
+                                'https://github.com/maiyoujian/cleaning_app/issues/new'
+                            )
+                        }
+                    >
+                        反馈与建议
+                    </button>
+                    <span className="text-gray-200">|</span>
+                    <button
+                        type="button"
+                        className="hover:text-gray-900 transition-colors cursor-pointer"
+                        onClick={() =>
+                            openExternalUrl(
+                                'https://github.com/maiyoujian/cleaning_app/releases'
+                            )
+                        }
+                    >
+                        下载最新版
+                    </button>
                 </div>
             )}
         </div>
